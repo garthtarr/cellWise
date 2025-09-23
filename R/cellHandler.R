@@ -154,13 +154,19 @@ huberweights <- function(x, b) {
 
 ## Initial estimators:
 
-DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL) 
+DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL, fixedCenter = FALSE) 
 {
-  DDC_controlled <- function(X, tolProbCell, maxCol = 0.25) {
+  DDC_controlled <- function(X, tolProbCell, maxCol = 0.25, fixedCenter) {
     n <- dim(X)[1]
     d <- dim(X)[2]
-    DDCout <- DDC(X, list(fastDDC = FALSE, silent = TRUE, 
-                          tolProbCell = tolProbCell, standType = "wrap"))
+    if (fixedCenter) {
+      DDCout <- DDC(X, list(fastDDC = FALSE, silent = TRUE, 
+                            tolProbCell = tolProbCell, standType = "wrap",
+                            center = rep(0, d)))
+    } else {
+      DDCout <- DDC(X, list(fastDDC = FALSE, silent = TRUE, 
+                            tolProbCell = tolProbCell, standType = "wrap"))
+    }
     Wna <- matrix(0, n, d)
     Wna[DDCout$indcells] <- 1
     overflag <- which(colSums(Wna) > maxCol * n)
@@ -181,10 +187,11 @@ DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL)
     return(DDCout)
   }
   
-  iDDC9I.O.Wrap <- function(X, maxCol = 0.25, lmin, lmax) {
+  iDDC9I.O.Wrap <- function(X, maxCol = 0.25, lmin, lmax,fixedCenter) {
     n <- dim(X)[1]
     d <- dim(X)[2]
-    DDCout <- DDC_controlled(X, tolProbCell = 0.9, maxCol = maxCol)
+    DDCout <- DDC_controlled(X, tolProbCell = 0.9, maxCol = maxCol,
+                             fixedCenter = fixedCenter)
     locScale <- list(loc = DDCout$locX, scale = DDCout$scaleX)
     Z <- scale(X, locScale$loc, locScale$scale)
     Zimp <- scale(DDCout$Ximp, locScale$loc, locScale$scale)
@@ -200,7 +207,7 @@ DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL)
     keep = which(eig$values >= lmin)
     eigenvectors <- eig$vectors[,keep]
     Zimp_proj <- Zimp %*% eigenvectors # scores
-    locscale_proj <- estLocScale(Zimp_proj, silent=TRUE)
+    locscale_proj <- estLocScale(Zimp_proj, silent=TRUE, center = FALSE)
     locscale_proj$scale = pmax(locscale_proj$scale, lmin)
     Zimp_proj_w <- wrap(Zimp_proj, locscale_proj$loc, locscale_proj$scale)$Xw
     cov <- eigenvectors %*% cov(Zimp_proj_w) %*% t(eigenvectors)
@@ -219,8 +226,8 @@ DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL)
     return(rowinds)
   }
   
-  iDDC9I.O.Wrap.RR <- function(X, maxCol = 0.25, lmin, lmax) {
-    result <- iDDC9I.O.Wrap(X, maxCol = maxCol, lmin = lmin, lmax = lmax)
+  iDDC9I.O.Wrap.RR <- function(X, maxCol = 0.25, lmin, lmax, fixedCenter) {
+    result <- iDDC9I.O.Wrap(X, maxCol = maxCol, lmin = lmin, lmax = lmax, fixedCenter = fixedCenter)
     cov <- result$cov
     # cov = truncEig(cov, lmin, lmax)
     locScale <- result$locScale
@@ -243,7 +250,7 @@ DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL)
     stop(paste0("You need at least ", d + 1, " cases to estimate a nonsingular \n", 
                 "covariance matrix of size ", d, ", but there are only ", 
                 n, " cases.\n", "You need to add cases or remove variables."))
-  result <- iDDC9I.O.Wrap.RR(X, maxCol = maxCol, lmin = lmin, lmax = lmax)
+  result <- iDDC9I.O.Wrap.RR(X, maxCol = maxCol, lmin = lmin, lmax = lmax, fixedCenter = fixedCenter)
   cov <- result$cov
   locScale <- result$locScale
   Z <- result$Z

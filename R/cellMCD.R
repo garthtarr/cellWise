@@ -1,7 +1,7 @@
 
 cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4, 
-                   noCits = 100, lmin = 1e-4,
-                   checkPars = list()) {
+                    noCits = 100, lmin = 1e-4, fixedCenter = FALSE,
+                    checkPars = list()) {
   #
   # checkPars is as in cellWise::transfo(). If not coreOnly,
   # we run checkDataSet() like we did in other functions.
@@ -29,6 +29,7 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
   #             standardized data. Could e.g. be set to
   #             2*ncol(X) since the largest eigenvalue is at
   #             most d max_{ij} |C_{ij}| = d max_j |C_{jj}|.
+  # fixedCenter: if TRUE, cellMCD is fit with a fixed center at O.
   # checkPars : Optional list of parameters used in the call 
   #            to cellMCD. The options are:
   #     - coreOnly: If TRUE, skip the execution of checkDataset. 
@@ -47,8 +48,8 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
   
   lmax <- NULL # upper bound on maximum eigenvalue. not used
   
-  Cstep <- function(X, W, mu, Sigma, Sigmai, lambdas, h,
-                   precScale=1e-12){
+  Cstep <- function(X, W, mu, Sigma, Sigmai, lambdas, h, fixedCenter,
+                    precScale=1e-12){
     # Performs the C-step for cellMCD.
     # Part 1 updates W for fixed mu and Sigma,
     # Part 2 updates mu and Sigma for fixed W.
@@ -96,22 +97,29 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
     # Now one M-step, with the same formulas as if the sufficient 
     # statistics Ximp and "bias" came from complete data:
     #
-    mu    <- colMeans(Ximp)
+    if (!fixedCenter) {
+      mu    <- colMeans(Ximp)
+    }
     bias  <- bias / n
-    Sigma <- cov(Ximp) * (n - 1) / n + bias
+    if (!fixedCenter) {
+      Sigma <- cov(Ximp) * (n - 1) / n + bias
+    } else {
+      Sigma <- (t(Ximp) %*% Ximp) / n + bias
+    }
     return(list(W = W, mu = mu, Sigma = Sigma))
   }
   
   iterMCD <- function(X,
-                     initEst,
-                     alpha=0.75,
-                     lambdas,
-                     precScale=1e-12,
-                     crit=1e-4,
-                     noCits=100,
-                     lmin = NULL,
-                     lmax = NULL,
-                     silent) {
+                      initEst,
+                      alpha=0.75,
+                      lambdas,
+                      precScale=1e-12,
+                      crit=1e-4,
+                      noCits=100,
+                      lmin = NULL,
+                      lmax = NULL,
+                      fixedCenter = FALSE,
+                      silent) {
     #
     if (!is.list(initEst)) stop("initEst should be a list") 
     h <- ceiling(alpha * dim(X)[1])
@@ -131,14 +139,15 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
     penalty  <- sum(lambdas * colSums(1 - W))
     objvals[nosteps + 1] <- Objective_cpp(X, W, mu, Sigma, Sigmai) + penalty
     if (!silent) cat(paste0("\nObjective at step ", nosteps, " = ",
-                           round(objvals[nosteps + 1], 5), "\n"))
+                            round(objvals[nosteps + 1], 5), "\n"))
     prevW     <- W
     prevmu    <- mu
     prevSigma <- Sigma
     
     while (convcrit > crit && nosteps < noCits) {
       Cresult  <- Cstep(X = X, W = W, mu = mu, Sigma = Sigma,
-                       Sigmai = Sigmai, lambdas = lambdas, h = h)
+                        Sigmai = Sigmai, lambdas = lambdas, h = h,
+                        fixedCenter = fixedCenter)
       convcrit <- max(abs((Cresult$Sigma - Sigma))) 
       W       <- Cresult$W
       mu      <- Cresult$mu
@@ -201,7 +210,12 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
   #
   # Robustly standardize the data
   #
-  locsca  <- cellWise::estLocScale(X)
+  if (fixedCenter) {
+    locsca  <- cellWise::estLocScale(X, center = FALSE)
+  } else {
+    locsca  <- cellWise::estLocScale(X)
+  }
+  
   rscales <- locsca$scale
   Xs      <- scale(X, center = locsca$loc, scale = rscales)
   #
@@ -226,7 +240,8 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
     stop("Too many marginal outliers plus NA's.")
   }
   #
-  DDCWout <- DDCWcov(Xs, maxCol = 1 - alpha, lmin = lmin, lmax = lmax)
+  DDCWout <- DDCWcov(Xs, maxCol = 1 - alpha, lmin = lmin, lmax = lmax,
+                     fixedCenter = fixedCenter)
   initEst <- list(mu = DDCWout$center, Sigma = DDCWout$cov)
   #
   # We set the marginal outliers to NA so they stay flagged:
@@ -238,7 +253,8 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
   temp    <- iterMCD(Xs, initEst = initEst, alpha = alpha, lambdas = lambdas, 
                      precScale = checkPars$precScale, crit = crit, 
                      noCits = noCits,  
-                     lmin = lmin, lmax = lmax, 
+                     lmin = lmin, lmax = lmax,
+                     fixedCenter = fixedCenter,
                      silent = checkPars$silent)
   W <- temp$W
   rownames(W) <- rownames(X)

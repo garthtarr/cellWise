@@ -297,7 +297,7 @@ LocScaleEstimators::locscale LocScaleEstimators::uniMcd(arma::vec y,
       y = y(I);
       sh(0) = arma::sum(y.head(quan));
       sh2(0) = std::pow(sh(0), 2) / quan;
-      sq(0) = arma::conv_to<double>::from(arma::sum(arma::pow(y.head(quan), 2)) - sh2(0));
+      sq(0) = arma::as_scalar(arma::sum(arma::pow(y.head(quan), 2)) - sh2(0));
       
       for (int i = 1; i < len ; i++) {
         sh(i) = sh(i - 1) - y(i - 1) + y(i + quan - 1);
@@ -426,7 +426,7 @@ LocScaleEstimators::Xlocscale LocScaleEstimators::estLocScale(const arma::mat &X
                 arma::datum::nan,
                 arma::datum::nan, precScale);
       } else {
-        out.loc(i) = 0;
+        out.loc(i) = 0.0;
       }
       out.scale(i) = LocScaleEstimators::scale1StepM(tempCol-out.loc(i),
                 LocScaleEstimators::rhoHuber15,
@@ -436,6 +436,7 @@ LocScaleEstimators::Xlocscale LocScaleEstimators::estLocScale(const arma::mat &X
   case 2:
     for (unsigned int i = 0; i < X.n_cols; i++) {
       arma::vec tempCol = X.col(i);
+      
       if (nLocScaleFlag) {
         arma::uvec sampleFrom = arma::find_finite(tempCol);
         if (sampleFrom.size() > nLocScale){
@@ -450,9 +451,14 @@ LocScaleEstimators::Xlocscale LocScaleEstimators::estLocScale(const arma::mat &X
       double s0 = uni.scale;
       
       // 1 step M estimate for location
-      double m1  =  LocScaleEstimators::loc1StepM(tempCol,
-                                                  LocScaleEstimators::locWeightTanh154,
-                                                  m0, s0, precScale);
+      double m1;
+      if (center) {
+        m1  =  LocScaleEstimators::loc1StepM(tempCol,
+                                             LocScaleEstimators::locWeightTanh154,
+                                             m0, s0, precScale);
+      } else {
+        m1 = 0.0;
+      }
       out.loc(i) = m1;
       out.scale(i) = s0;
     }

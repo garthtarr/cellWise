@@ -87,9 +87,10 @@ generateData = function(n, d,
         continds <- which(W[i, ] == 1)
         if (length(continds) > 0) {
           eigen_out <- eigen(Sigma[continds, continds])$vectors
-          replacement <- eigen_out[, length(continds)] /
-            sqrt(mahalanobis(eigen_out[, length(continds)], mu[continds], Sigma[continds, continds]))
-          X[i, continds] <- replacement * gamma * sqrt(length(continds))
+          replacement <- eigen_out[, length(continds)]/
+            sqrt(mahalanobis(eigen_out[, length(continds)], 
+                             rep(0,length(continds)), Sigma[continds, continds]))
+          X[i, continds] <- mu[continds] + replacement * gamma * sqrt(length(continds))
           indcells <- c(indcells, i + (continds - 1) * n)
         }
       }

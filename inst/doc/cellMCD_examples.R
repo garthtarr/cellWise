@@ -222,7 +222,9 @@ X <- as.matrix(aircraft)
 nrow(X) / ncol(X)
 
 ## ----error=TRUE---------------------------------------------------------------
+try({
 cellout <- cellMCD(X)
+})
 
 ## -----------------------------------------------------------------------------
 data(alcohol)
@@ -345,9 +347,11 @@ cd = sqrt(mahalanobis(X, center = cellout$mu, cov = cellout$S))
 round(cor(rd, cd), 3) 
 
 ## ----error=TRUE---------------------------------------------------------------
+try({
 data(lactic)
 X <- as.matrix(lactic)
 X <- transfo(X)$Y
+})
 
 ## -----------------------------------------------------------------------------
 data(milk)
@@ -360,6 +364,7 @@ cd <- sqrt(mahalanobis(X, center = cellout$mu, cov = cellout$S))
 round(cor(rd, cd), 3) 
 
 ## ----error=TRUE---------------------------------------------------------------
+try({
 data(pension)
 X <- as.matrix(pension)
 X <- transfo(X)$Y
@@ -368,6 +373,7 @@ rd <- sqrt(mahalanobis(X,center=rowout$center,cov=rowout$cov))
 cellout <- cellMCD(X)
 cd <- sqrt(mahalanobis(X,center=cellout$mu,cov=cellout$S))
 round(cor(rd,cd),3) 
+})
 
 ## -----------------------------------------------------------------------------
 data(phosphor)
@@ -446,6 +452,7 @@ cd <- sqrt(mahalanobis(X, center = cellout$mu, cov = cellout$S))
 round(cor(rd,cd),3) 
 
 ## ----error = TRUE-------------------------------------------------------------
+try({
 data(toxicity)
 X <- as.matrix(toxicity)
 X <- transfo(X)$Y
@@ -454,6 +461,7 @@ rd     <- sqrt(mahalanobis(X,center=rowout$center,cov=rowout$cov))
 cutoff <- sqrt(qchisq(0.975,ncol(X)))
 sum(rd > cutoff) 
 cellout <- cellMCD(X)
+})
 
 ## -----------------------------------------------------------------------------
 data(wood)

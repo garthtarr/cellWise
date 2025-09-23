@@ -12,7 +12,7 @@ which is based on observed Gaussian log-likelihood. By default, it starts by cal
 \usage{
 cellMCD(X, alpha = 0.75, quant = 0.99,
         crit = 1e-4, noCits = 100, lmin = 1e-4,
-        checkPars = list())
+        fixedCenter = FALSE, checkPars = list())
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -29,7 +29,7 @@ cellMCD(X, alpha = 0.75, quant = 0.99,
 \item{noCits}{The maximal number of C-steps used.}
 
  \item{lmin}{ a lower bound on the eigenvalues of the estimated covariance matrix on the standardized data. Defaults to \eqn{1e-4}. Should not be smaller than \eqn{1e-6}.}
-
+\item{fixedCenter}{ if \code{TRUE}, cellMCD is fit around a fixed center in the origin.}
   \item{checkPars}{Optional list of parameters used in the call to
  \code{\link{checkDataSet}}. The options are:
   \itemize{

@@ -518,7 +518,7 @@ Rcpp::List findCellPath_cpp(arma::mat & predictors,
     // containers for used output
     arma::mat beta = arma::mat(maxSteps + 1, x.n_cols, arma::fill::zeros);
     arma::vec RSS(maxSteps + 1 , arma::fill::zeros);
-    RSS(0) = arma::conv_to<double>::from(arma::sum(arma::pow(residuals, 2))); // initial MD^2
+    RSS(0) = arma::as_scalar(arma::sum(arma::pow(residuals, 2))); // initial MD^2
     arma::cube bmat  = arma::cube(maxSteps + 1, x.n_cols, x.n_cols, arma::fill::zeros);
     arma::uvec path;
     arma::rowvec betaOLS(x.n_cols);
@@ -667,7 +667,7 @@ Rcpp::List findCellPath_cpp(arma::mat & predictors,
       for(unsigned int i = 0; i < Posaction.size(); i++) {
         bmat.row(totPosactions + i + 1) = bmat_replacement; // the first one is a zero matrix
         beta.row(totPosactions + i + 1) = betaOLS;
-        RSS(totPosactions + i + 1) = arma::conv_to<double>::from(arma::sum(arma::pow(residuals, 2)));
+        RSS(totPosactions + i + 1) = arma::as_scalar(arma::sum(arma::pow(residuals, 2)));
       }
       
       actions.subvec(totactions, totactions+action.size() - 1) = action;
@@ -706,7 +706,7 @@ Rcpp::List findCellPath_cpp(arma::mat & predictors,
       for (unsigned int i = 0; i < missingInds.size(); i++) {
         // bmat.row(bmat.n_rows - i - 1)  = solve(Sigmai); // maybe we don't need these?
         beta.row(beta.n_rows - i - 1) = betaOLS;
-        RSS(RSS.size() - i - 1) = arma::conv_to<double>::from(arma::sum(arma::pow(residuals, 2)));
+        RSS(RSS.size() - i - 1) = arma::as_scalar(arma::sum(arma::pow(residuals, 2)));
       }
     }
     //// End of lar_ols
@@ -714,7 +714,7 @@ Rcpp::List findCellPath_cpp(arma::mat & predictors,
     
     // arma::mat beta = arma::mat(maxSteps + 1, x.n_cols);
     // arma::vec RSS(maxSteps, arma::fill::zeros);
-    // RSS_sw(0) = arma::conv_to<double>::from(arma::sum(arma::pow(residuals, 2))); // initial MD^2
+    // RSS_sw(0) = arma::as_scalar(arma::sum(arma::pow(residuals, 2))); // initial MD^2
     // arma::cube bmat  = arma::cube(maxSteps + 1, x.n_cols, x.n_cols, arma::fill::zeros);
     // arma::vec ordering;
     // 
