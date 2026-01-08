@@ -33,3 +33,11 @@ updateW_cpp <- function(X, W, mu, Sigma, Sigmai, lambda, h) {
     .Call(`_cellWise_updateW_cpp`, X, W, mu, Sigma, Sigmai, lambda, h)
 }
 
+Cstep <- function(X, W, mu, Sigma, Sigmai, lambda, h, fixedCenter) {
+    .Call(`_cellWise_Cstep`, X, W, mu, Sigma, Sigmai, lambda, h, fixedCenter)
+}
+
+lts_cpp <- function(X, y, alpha, lambda, nrep, maxIts, nFinal, precScale, h) {
+    .Call(`_cellWise_lts_cpp`, X, y, alpha, lambda, nrep, maxIts, nFinal, precScale, h)
+}
+

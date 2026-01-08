@@ -971,6 +971,113 @@ arma::umat updateW_cpp(const arma::mat &X,
     ::Rf_error( "c++ exception " "(unknown reason)" );
   }
   arma::umat error_out(1,1);
-  error_out.fill(arma::datum::nan);
+  error_out.fill(0);
   return error_out;
 }
+
+
+
+
+// [[Rcpp::export]]
+Rcpp::List Cstep(const arma::mat &X,
+                 arma::umat W,
+                 const arma::vec &mu,
+                 const arma::mat &Sigma,
+                 const arma::mat &Sigmai,
+                 const arma::vec &lambda,
+                 const arma::uword &h,
+                 const bool fixedCenter) {
+  try
+  {
+    // First update W
+    
+    arma::uword n = W.n_rows;
+    arma::uword d = W.n_cols;
+    arma::uvec ord = arma::stable_sort_index(arma::sum(W, 0));
+    arma::vec Delta(n);
+    arma::uvec goodCells;
+    arma::uvec wnew(n);
+    arma::uvec Delta_rank(n);
+    for (arma::uword j = 0; j < d; j++) {
+      arma::uword jtemp = ord(j);
+      Delta = Deltacalc_cpp2(X, W, Sigma, Sigmai, mu, jtemp + 1);
+      goodCells = arma::find(Delta <= lambda(jtemp));
+      if (goodCells.n_elem < h) {
+        Delta_rank = arma::stable_sort_index(Delta - lambda(jtemp));
+        goodCells = Delta_rank.head(h);
+      }
+      wnew.zeros();
+      wnew(goodCells).fill(1);
+      W.col(jtemp) = wnew;
+    }
+    
+    
+    
+    // Now execute one EM step:
+    // first compute Ximp
+    
+    arma::mat Ximp = X;
+    
+    std::unordered_map<std::string, arma::uvec> Wmap;
+    uniqueRows(W, Wmap);
+    
+    arma::mat bias(d, d, arma::fill::zeros);
+    
+    for (std::pair<std::string, arma::uvec> s : Wmap) {
+      
+      
+      arma::uvec myrows = s.second; // all indices with rowpattern(string) s
+      arma::urowvec w = W.row(myrows(0)); // the actual rowpattern
+      
+      arma::uvec obs = arma::find(w);
+      arma::uvec mis = arma::find(1 - w);
+      
+      if (mis.n_elem < d) {
+        if (mis.n_elem > 0) {
+          
+          arma::mat Sigmai_temp = subinverse_cpp(Sigmai, Sigma, mis); //solve(Sigmai[mis, mis])  
+          bias(mis,mis) += (Sigmai_temp * (double)myrows.n_elem);
+   
+          for (arma::uword i = 0; i < myrows.n_elem; i++) {
+            arma::uvec rowi(1);
+            rowi(0) = myrows(i);
+            Ximp(rowi, mis) = mu(mis).t() - (Sigmai_temp * Sigmai(mis, obs) *(X(rowi, obs).t() - mu(obs))).t();
+          }
+        }
+      } else { // all elements of this pattern are missing
+        bias += (Sigma * (double)myrows.n_elem);
+        for (arma::uword i = 0; i < myrows.n_elem; i++) {
+          Ximp.row(myrows(i)) = mu.t();
+        }
+      }
+    }
+    
+    arma::vec newmu = mu;
+    if (!fixedCenter) {
+      newmu = mean(Ximp, 0).t();
+    }
+    
+    bias /= (double)n;
+    
+    arma::mat newSigma = bias;
+    if (!fixedCenter) {
+      newSigma += arma::cov(Ximp, 1);
+    } else {
+      newSigma += (Ximp.t() * Ximp) / (double)n ;
+    }
+    
+    return Rcpp::List::create(Rcpp::Named("W") = W,
+                              Rcpp::Named("mu") = newmu,
+                              Rcpp::Named("Sigma") = newSigma);
+  } catch( std::exception& __ex__ )
+  {
+    forward_exception_to_r( __ex__ );
+  } catch(...)
+  {
+    ::Rf_error( "c++ exception " "(unknown reason)" );
+  }
+  return Rcpp::List::create(Rcpp::Named("error") = true);
+}
+
+
+

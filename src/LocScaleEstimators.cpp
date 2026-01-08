@@ -277,9 +277,8 @@ LocScaleEstimators::locscale LocScaleEstimators::uniMcd(arma::vec y,
     weightsOut(I) = weightsOut; // I allows us to put the weights in the right order
     out.weights(indfin) = weightsOut; 
     
-    double sqscale = std::sqrt(std::max(0.0,
-                                        arma::sum(y2(weights))) / (weights.size() - 1));
-    out.scale = 1.0835 * sqrt(sqscale);
+    double sqscale = std::max(0.0, arma::sum(y2(weights))) / (weights.size() - 1);
+    out.scale = 1.0835 * std::sqrt(sqscale);
     
   } else {
     if (len == 1) {

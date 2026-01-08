@@ -1,11 +1,11 @@
 Package: cellWise
 Type: Package
-Version: 2.5.4
-Date: 2025-09-23
+Version: 2.5.5
+Date: 2026-01-05
 Title: Analyzing Data with Cellwise Outliers
 Authors@R: c(
             person(given="Jakob",family="Raymaekers", role = c("aut","cre"),
-            email="jakob.raymaekers@kuleuven.be"),
+            email="jakob.raymaekers@uantwerpen.be"),
             person(given="Peter",family="Rousseeuw", role = c("aut")),
             person(given="Wannes",family="Van den Bossche", role = c("ctb")),
             person(given="Mia",family="Hubert", role = c("ctb")) 
@@ -34,10 +34,10 @@ Author: Jakob Raymaekers [aut, cre],
   Peter Rousseeuw [aut],
   Wannes Van den Bossche [ctb],
   Mia Hubert [ctb]
-Maintainer: Jakob Raymaekers <jakob.raymaekers@kuleuven.be>
+Maintainer: Jakob Raymaekers <jakob.raymaekers@uantwerpen.be>
 VignetteBuilder: knitr
 RoxygenNote: 7.1.2
 NeedsCompilation: yes
-Packaged: 2025-09-23 09:37:46 UTC; Jakob Raymaekers
+Packaged: 2026-01-08 07:50:53 UTC; Jakob Raymaekers
 Repository: CRAN
-Date/Publication: 2025-09-23 14:00:02 UTC
+Date/Publication: 2026-01-08 15:20:13 UTC

@@ -162,10 +162,10 @@ DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL, fixedCenter = FA
     if (fixedCenter) {
       DDCout <- DDC(X, list(fastDDC = FALSE, silent = TRUE, 
                             tolProbCell = tolProbCell, standType = "wrap",
-                            center = rep(0, d)))
+                            center = rep(0, d), coreOnly = TRUE))
     } else {
       DDCout <- DDC(X, list(fastDDC = FALSE, silent = TRUE, 
-                            tolProbCell = tolProbCell, standType = "wrap"))
+                            tolProbCell = tolProbCell, standType = "wrap", coreOnly = TRUE))
     }
     Wna <- matrix(0, n, d)
     Wna[DDCout$indcells] <- 1
@@ -181,9 +181,9 @@ DDCWcov = function(X, maxCol = 0.25, lmin = 1e-04, lmax = NULL, fixedCenter = FA
       DDCout$indcells <- which(Wna == 1)
       DDCout$Ximp <- X
       DDCout$Ximp[DDCout$indcells] <- DDCout$Xest[DDCout$indcells]
-      NAcells = which(is.na(DDCout$Ximp))
-      DDCout$Ximp[NAcells] <- DDCout$Xest[NAcells]
     }
+    NAcells = which(is.na(DDCout$Ximp))
+    DDCout$Ximp[NAcells] <- DDCout$Xest[NAcells]
     return(DDCout)
   }
   

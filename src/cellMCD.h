@@ -25,5 +25,10 @@ arma::vec Deltacalc_cpp(const arma::mat & X,
                         const arma::vec & mu,
                         arma::uword j);
 
-
+arma::vec Deltacalc_cpp2(const arma::mat & X,
+                         const arma::umat & W,
+                         const arma::mat & Sigma,
+                         const arma::mat & Sigmai,
+                         const arma::vec & mu,
+                         arma::uword j);
 #endif
