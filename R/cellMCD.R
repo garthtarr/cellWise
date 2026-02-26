@@ -1,4 +1,5 @@
 
+
 cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4, 
                     noCits = 100, lmin = 1e-4, fixedCenter = FALSE,
                     checkPars = list()) {
@@ -46,130 +47,6 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
   # First some auxiliary functions that are only used here, so 
   # they don't show up in the list of functions:
   
-  lmax <- NULL # upper bound on maximum eigenvalue. not used
-  
-  Cstep <- function(X, W, mu, Sigma, Sigmai, lambdas, h, fixedCenter,
-                    precScale=1e-12){
-    # Performs the C-step for cellMCD.
-    # Part 1 updates W for fixed mu and Sigma,
-    # Part 2 updates mu and Sigma for fixed W.
-    #
-    dims <- dim(X)
-    n    <- dims[1]
-    d    <- dims[2]
-    #
-    # Part 1: start by updating W. 
-    W <- updateW_cpp(X = X, W = W, mu = mu,
-                     Sigma = Sigma, Sigmai = Sigmai,
-                     lambda = lambdas, h = h)
-    
-    
-    # Part 2: now execute one EM-step. 
-    #
-    # First take one E-step.
-    # This can be done faster: we should only need to invert 
-    # a single matrix here!
-    # We could also loop over patterns instead of rows.
-    #
-    Ximp <- X # will contain suff stats for estimating mu
-    bias <- matrix(0, d, d) # more suff stats for estimating Sigma
-    #
-    for (i in 1:n) { # loops over rows, not patterns
-      mis <- which(W[i, ] == 0)
-      obs <- which(W[i, ] == 1)
-      x <- X[i, ]
-      if (length(mis) > 0)  {
-        if (length(mis) == d) { # whole row is missing
-          ximp <- mu # just plug in old mu
-          bias <- bias + Sigma # "bias" is updated by old Sigma
-        } else{
-          ximp <- x
-          Sigmai_temp <- solve(Sigmai[mis, mis]) 
-          ximp[mis] <- mu[mis] - Sigmai_temp %*%
-            Sigmai[mis, obs, drop = F] %*%
-            t(X[i, obs, drop = F] - mu[obs]) 
-          bias[mis, mis] <- bias[mis, mis] + Sigmai_temp
-        }
-        Ximp[i, ] <- ximp
-      }
-    }
-    #
-    # Now one M-step, with the same formulas as if the sufficient 
-    # statistics Ximp and "bias" came from complete data:
-    #
-    if (!fixedCenter) {
-      mu    <- colMeans(Ximp)
-    }
-    bias  <- bias / n
-    if (!fixedCenter) {
-      Sigma <- cov(Ximp) * (n - 1) / n + bias
-    } else {
-      Sigma <- (t(Ximp) %*% Ximp) / n + bias
-    }
-    return(list(W = W, mu = mu, Sigma = Sigma))
-  }
-  
-  iterMCD <- function(X,
-                      initEst,
-                      alpha=0.75,
-                      lambdas,
-                      precScale=1e-12,
-                      crit=1e-4,
-                      noCits=100,
-                      lmin = NULL,
-                      lmax = NULL,
-                      fixedCenter = FALSE,
-                      silent) {
-    #
-    if (!is.list(initEst)) stop("initEst should be a list") 
-    h <- ceiling(alpha * dim(X)[1])
-    p <- ncol(X)
-    n <- nrow(X)
-    
-    mu     <- initEst$mu
-    Sigma  <- initEst$Sigma
-    Sigmai <- mpinv(Sigma)$Inv
-    if (is.null(initEst$W)) { W <- matrix(1, n, p)
-    } else { W <- initEst$W }
-    W[is.na(X)] <- 0 # to deal with NA's in data
-    
-    convcrit <- 1
-    nosteps  <- 0
-    objvals  <- rep(NA, noCits + 1)
-    penalty  <- sum(lambdas * colSums(1 - W))
-    objvals[nosteps + 1] <- Objective_cpp(X, W, mu, Sigma, Sigmai) + penalty
-    if (!silent) cat(paste0("\nObjective at step ", nosteps, " = ",
-                            round(objvals[nosteps + 1], 5), "\n"))
-    prevW     <- W
-    prevmu    <- mu
-    prevSigma <- Sigma
-    
-    while (convcrit > crit && nosteps < noCits) {
-      Cresult  <- Cstep(X = X, W = W, mu = mu, Sigma = Sigma,
-                        Sigmai = Sigmai, lambdas = lambdas, h = h,
-                        fixedCenter = fixedCenter)
-      convcrit <- max(abs((Cresult$Sigma - Sigma))) 
-      W       <- Cresult$W
-      mu      <- Cresult$mu
-      Sigma   <- Cresult$Sigma
-      Sigma   <- truncEig(Sigma, lmin, lmax)
-      Sigmai  <- solve(Sigma)
-      penalty <- sum(lambdas * colSums(1 - W))
-      objvl   <- Objective_cpp(X, W, mu, Sigma, Sigmai) + penalty 
-      if (objvl > objvals[nosteps + 1]) { 
-        return(list(W = prevW, mu = prevmu, Sigma = prevSigma,
-                    nosteps = nosteps))
-      }
-      if (!silent) cat(paste0("Objective at step ", nosteps + 1, " = ",
-                              round(objvl, 5), "\n"))
-      nosteps <- nosteps + 1
-      objvals[nosteps+1] <- objvl
-      prevW     <- W
-      prevmu    <- mu
-      prevSigma <- Sigma
-    }
-    return(list(W = W, mu = mu, Sigma = Sigma, nosteps = nosteps))
-  }
   
   # Here the main function starts:
   #
@@ -240,7 +117,7 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
     stop("Too many marginal outliers plus NA's.")
   }
   #
-  DDCWout <- DDCWcov(Xs, maxCol = 1 - alpha, lmin = lmin, lmax = lmax,
+  DDCWout <- DDCWcov(Xs, maxCol = 1 - alpha, lmin = lmin, lmax = NULL,
                      fixedCenter = fixedCenter)
   initEst <- list(mu = DDCWout$center, Sigma = DDCWout$cov)
   #
@@ -250,12 +127,18 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
   logC    <- -log(diag(solve(initEst$Sigma)))
   cutoff  <- qchisq(quant, df = 1)
   lambdas <- cutoff + logC + log(2 * pi)
-  temp    <- iterMCD(Xs, initEst = initEst, alpha = alpha, lambdas = lambdas, 
-                     precScale = checkPars$precScale, crit = crit, 
-                     noCits = noCits,  
-                     lmin = lmin, lmax = lmax,
-                     fixedCenter = fixedCenter,
-                     silent = checkPars$silent)
+  h       <- ceiling(alpha * nrow(Xs))
+  temp    <- iterMCD_cpp(Xs,
+                         initEst$mu,
+                         initEst$Sigma,
+                         h,
+                         lambdas,
+                         crit,
+                         noCits,
+                         lmin,
+                         checkPars$precScale,
+                         fixedCenter,
+                         checkPars$silent)
   W <- temp$W
   rownames(W) <- rownames(X)
   colnames(W) <- colnames(X)
@@ -292,6 +175,9 @@ cellMCD <- function(X, alpha = 0.75, quant = 0.99, crit = 1e-4,
               nosteps = temp$nosteps,
               X = X, quant = quant))
 } 
+
+
+
 
 
 plot_cellMCD = function(cellout, type = "Zres/X", whichvar = NULL,

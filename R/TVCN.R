@@ -2,12 +2,13 @@ transfo = function(X, type = "YJ", robust = TRUE,
                    standardize = TRUE, 
                    quant = 0.99, nbsteps = 2, 
                    checkPars = list()) {
-  if (is.vector(X)) {
-    X <- matrix(X, ncol = 1)
-  }
+  
+  
+  rownamX = rownames(X)
+  colnamX = tmpcolnamX = colnames(X)
+  
   X <- as.matrix(X)
-  dorig = ncol(X) # added
-  colnamX = colnames(X)
+  dorig = ncol(X) 
   if(is.null(colnamX)) { colnamX = seq_len(dorig) }
   
   if (nbsteps < 1) {
@@ -27,10 +28,14 @@ transfo = function(X, type = "YJ", robust = TRUE,
   }
   out <- NULL
   if (!checkPars$coreOnly) {
-    out <- checkDataSet(X, fracNA = 1, numDiscrete = checkPars$numDiscrete, 
+    out <- checkDataSet(X, fracNA = 1,
+                        numDiscrete = checkPars$numDiscrete, 
                         precScale = checkPars$precScale, 
                         silent = checkPars$silent)
     X <- out$remX
+  } else {
+    out$colInAnalysis <- 1:d
+    names(out$colInAnalysis) <- colnamX
   }
   n <- nrow(X)
   d <- ncol(X) # from here on, only that many columns and entries
@@ -188,7 +193,11 @@ transfo = function(X, type = "YJ", robust = TRUE,
   else {
     Xt
   }
-  # must add dorig to output list
+  
+  rownames(Y) = rownamX
+  if (is.null(tmpcolnamX)) { colnames(Y) = NULL } # changed
+  if (ncol(Y) == 1) {Y = as.vector(Y)}
+  
   return(c(list(lambdahats = lambdahats, objective = objective, 
                 Y = Y, weights = weights, ttypes = ttypes, muhat = muhat, 
                 sigmahat = sigmahat, locx = locx, scalex = scalex, 
@@ -196,40 +205,264 @@ transfo = function(X, type = "YJ", robust = TRUE,
                                                       colnamX = colnamX) ) )
 }
 
-
-transfo_newdata = function(Xnew, transfo.out) {
-  if (is.vector(Xnew)) {
-    Xnew <- matrix(Xnew, ncol = 1)
+transfo_transformback <- function(Ynew, transfo.out) 
+{ 
+  
+  Ynew <- as.matrix(Ynew)
+  d = ncol(Ynew)
+  colnamnew = colnames(Ynew)
+  
+  
+  
+  if (is.null(colnamnew)) {
+    
+    if (d == 1) {
+      if (length(transfo.out$colInAnalysis) == 1) {
+        match.out = 1
+      } else {
+        stop("The original call to transfo() transformed several variables. The current input is one-dimensional. Please rerun transfo with this variable only.")
+      }
+    } else {
+      
+      if (is.null(colnames(transfo.out$Y))) {
+        if (d == transfo.out$dorig) {
+          
+          warning("Ynew does not have variable names. The number of columns matches that of the original number of input variables given to transfo(). We assume the input variables to this function are given in the same order.")
+          
+          if (d > length(transfo.out$colInAnalysis)) {
+            Ynew <- Ynew[, transfo.out$colInAnalysis]
+          } 
+          
+        } else if (d == length(transfo.out$colInAnalysis)) {
+          warning("Ynew does not have variable names. The number of columns matches that of the number of variables transformed by transfo. We assume that these are the input, in the same order.")
+        } else {
+          stop("Ynew does not have variable names, and the number of columns does not match that of the original input data to transfo, nor that of the selected columns for transformation. No reasonable match can thus be found.")
+        }
+        match.out <- 1:ncol(Ynew)
+      } else {
+        stop("Ynew does not have variable names, but the original input to transfo did. Please use the same variable names for the variables that need to be transformed.")
+      }
+      colnamnew <- seq_len(d)
+      match.out <- seq_len(d)
+    }
+  } else { # the input has column names
+    
+    if (is.null(colnames(transfo.out$Y))) {
+      stop("Ynew has variable names, but the original input to transfo() did not. Please match the variable names to the original input data.")
+    }
+    variablesPresent <- names(transfo.out$colInAnalysis) %in% colnamnew
+    
+    if (!all(variablesPresent)) {
+      stop("Ynew does not contain all the variables that were transformed in the original call to tansfo. Please check for a mismatch in variable names.")
+    }
+    
+    
+    match.out <- match(colnamnew, names(transfo.out$colInAnalysis))
+    naMatch <- which(is.na(match.out))
+    
+    if (length(naMatch) > 0) {
+      warning(paste0("The variables with names \n", paste0(colnamnew[
+        naMatch], collapse = ", "), 
+        "\n were dropped from the tranformation, as they were not transformed in the original call to transfo(). Continuing with the remaining variables."))
+      Ynew <- Ynew[, -naMatch]
+      match.out <- match.out[-naMatch]
+    }
+    
   }
+  
+  standardize <- transfo.out$standardize
+  locx <- transfo.out$locx[match.out]
+  scalex <- transfo.out$scalex[match.out]
+  ttypes <- transfo.out$ttypes[match.out]
+  lambdas <- transfo.out$lambdahats[match.out]
+  muhat <- transfo.out$muhat[match.out]
+  sigmahat <- transfo.out$sigmahat[match.out]
+  
+  colInAnalysis <- seq_len(ncol(Ynew))
+  
+  Xnew <- Ynew
+  for (j in colInAnalysis) { # j=1
+    ynewt <- Ynew[, j]
+    if (ttypes[j] == "YJ") {
+      xnewt <- ynewt
+      stan = " "
+      if (standardize) {
+        xnewt <- xnewt * sigmahat[j] + muhat[j]
+        stan = " destandardized "
+      }
+      if (lambdas[j] > 2) {
+        lowerb = -1/abs(lambdas[j] - 2)
+        newlowerb = 0.95 * lowerb
+        ## changed the following line due to crash:
+        # if (min(xnewt) < lowerb) 
+        mymin = min(xnewt, na.rm = TRUE) # changed
+        if (mymin < lowerb) # changed  
+          warning(paste0("The lowest", stan, "value in column ", 
+                         j, " was ", mymin, " .\n", "This is below the expected lower bound ", 
+                         lowerb, " .\n", "Such low", stan, "values were put equal to ", 
+                         newlowerb, "\nso they could be transformed back.")) # changed
+        xnewt = pmax(xnewt, newlowerb) # changed
+      }
+      if (lambdas[j] < 0) {
+        upperb = 1/abs(lambdas[j])
+        newupperb = 0.95 * upperb
+        ## changed following line due to crash:
+        # if (max(xnewt) > upperb)
+        mymax = max(xnewt, na.rm = TRUE) # changed
+        if (mymax > upperb) # changed 
+          warning(paste0("The highest", stan, "value in column ", 
+                         j, " was ", mymax, " .\n", "This is above the expected upper bound ", 
+                         upperb, " .\n", "Such high", stan, "values were put equal to ", 
+                         newupperb, "\nso they could be transformed back.")) # changed
+        xnewt = pmin(xnewt, newupperb)
+      }
+      xnewt <- iYJ(xnewt, lambdas[j], stdToo = FALSE)$yt # changed,
+      
+      if (standardize) {
+        xnewt <- xnewt * scalex[j] + locx[j]
+      }
+      Xnew[, j] <- xnewt
+    } else if (ttypes[j] == "BC") {
+      xnewt <- ynewt
+      stan = " "
+      if (standardize) {
+        xnewt <- xnewt * sigmahat[j] + muhat[j]
+        stan = " destandardized "
+      }
+      if (lambdas[j] > 0) {
+        lowerb = -1/abs(lambdas[j])
+        newlowerb = 0.95 * lowerb
+        mymin = min(xnewt, na.rm = TRUE) # changed
+        if (mymin < lowerb) # changed   
+          warning(paste0("The lowest", stan, "value in column ", 
+                         j, " was ", mymin, " .\n", "This is below the expected lower bound ", 
+                         lowerb, " .\n", "Such low", stan, "values were put equal to ", 
+                         newlowerb, "\nso they could be transformed back.")) # changed
+        xnewt = pmax(xnewt, newlowerb)  
+      }
+      if (lambdas[j] < 0) {
+        upperb = 1/abs(lambdas[j])
+        newupperb = 0.95 * upperb
+        mymax = max(xnewt,  na.rm = TRUE) # changed
+        if (mymax > upperb) # changed   
+          warning(paste0("The highest", stan, "value in column ", 
+                         j, " was ", mymax, " .\n", "This is above the expected upper bound ", 
+                         upperb, " .\n", "Such high", stan, "values were put equal to ", 
+                         newupperb, "\nso they could be transformed back.")) # changed
+        xnewt = pmin(xnewt, newupperb)   
+      }
+      xnewt <- iBC(xnewt, lambdas[j], stdToo = FALSE)$yt # changed,
+      
+      if (standardize) {
+        xnewt <- xnewt * scalex[j]
+      }
+      Xnew[, j] <- xnewt
+    }
+    else {
+      stop(paste0("Invalid transformation type ", ttypes[j], 
+                  " for column ", j))
+    }
+  }
+  if (ncol(Xnew) == 1) {
+    Xnew <- as.vector(Xnew)
+  }
+  return(Xnew)
+}
+
+
+transfo_newdata <- function(Xnew, transfo.out) { 
+  
+  
   Xnew <- as.matrix(Xnew)
   d = ncol(Xnew)
-  dorig = transfo.out$dorig
-  if(d != dorig) stop(paste0(
-    "Xnew should have ",dorig," columns like the original data."))
+  
   colnamnew = colnames(Xnew)
-  if(is.null(colnamnew)) { colnamnew = seq_len(d) }
-  if(all.equal(colnamnew, transfo.out$colnamX) != TRUE) stop(
-    "Xnew should have the same column names as the original data.")
-  colInA <- seq_len(d)
-  if (!is.null(transfo.out$out$colInAnalysis)) {
-    colInA <- transfo.out$out$colInAnalysis
+ 
+  
+  
+  
+  if (is.null(colnamnew)) {
+    
+    if (d == 1) {
+      if (length(transfo.out$colInAnalysis) == 1) {
+        match.out = 1
+      } else {
+        stop("The original call to transfo() transformed several variables. The current input is one-dimensional. Please rerun transfo with this variable only.")
+      }
+    } else {
+      
+      if (is.null(colnames(transfo.out$Y))) {
+        if (d == transfo.out$dorig) {
+          
+          warning("Xnew does not have variable names. The number of columns matches that of the original number of input variables given to transfo(). We assume the input variables to this function are given in the same order.")
+          
+          if (d > length(transfo.out$colInAnalysis)) {
+            Xnew <- Xnew[, transfo.out$colInAnalysis]
+          } 
+          
+        } else if (d == length(transfo.out$colInAnalysis)) {
+          warning("Xnew does not have variable names. The number of columns matches that of the number of variables transformed by transfo. We assume that these are the input, in the same order.")
+        } else {
+          stop("Xnew does not have variable names, and the number of columns does not match that of the original input data to transfo, nor that of the selected columns for transformation. No reasonable match can thus be found.")
+        }
+        match.out <- 1:ncol(Xnew)
+      } else {
+        stop("Xnew does not have variable names, but the original input to transfo did. Please use the same variable names for the variables that need to be transformed.")
+      }
+      colnamnew <- seq_len(d)
+      match.out <- seq_len(d)
+    }
+  } else { # the input has column names
+    
+    if (is.null(colnames(transfo.out$Y))) {
+      stop("Xnew has variable names, but the original input to transfo() did not. Please match the variable names to the original input data.")
+    }
+    variablesPresent <- names(transfo.out$colInAnalysis) %in% colnamnew
+    
+    if (!all(variablesPresent)) {
+      stop("Xnew does not contain all the variables that were transformed in the original call to tansfo. Please check for a mismatch in variable names.")
+    }
+    
+    
+    match.out <- match(colnamnew, names(transfo.out$colInAnalysis))
+    naMatch <- which(is.na(match.out))
+    
+    if (length(naMatch) > 0) {
+      warning(paste0("The variables with names \n", paste0(colnamnew[
+        naMatch], collapse = ", "), 
+        "\n were dropped from the tranformation, as they were not transformed in the original call to transfo(). Continuing with the remaining variables."))
+      Xnew <- Xnew[, -naMatch]
+      match.out <- match.out[-naMatch]
+    }
+    
   }
+  
+  
+  
+  
+  
+  ####
   standardize <- transfo.out$standardize
-  locx <- transfo.out$locx
-  scalex <- transfo.out$scalex
-  muhat <- transfo.out$muhat
-  sigmahat <- transfo.out$sigmahat
-  ttypes <- transfo.out$ttypes
-  lambdas <- transfo.out$lambdahats
+  locx <- transfo.out$locx[match.out]
+  scalex <- transfo.out$scalex[match.out]
+  ttypes <- transfo.out$ttypes[match.out]
+  lambdas <- transfo.out$lambdahats[match.out]
+  muhat <- transfo.out$muhat[match.out]
+  sigmahat <- transfo.out$sigmahat[match.out]
+  
+  colInAnalysis <- seq_len(ncol(Xnew))
+  
+  
   Ynew <- Xnew
-  for (j in colInA) {
-    xnewt <- Xnew[, colInA[j]] # actual column
+  for (j in colInAnalysis) {
+    xnewt <- Xnew[, j]
     if (ttypes[j] == "YJ") {
       ynewt <- xnewt
       if (standardize) {
         ynewt <- scale(ynewt, locx[j], scalex[j])
       }
-      ynewt <- YJ(ynewt, lambdas[j], stdToo = FALSE)$yt
+      ynewt <- YJ(ynewt, lambdas[j], stdToo = FALSE)$yt # changed,
+      
       if (standardize) {
         ynewt <- scale(ynewt, muhat[j], sigmahat[j])
       }
@@ -240,130 +473,25 @@ transfo_newdata = function(Xnew, transfo.out) {
       if (standardize) {
         ynewt <- ynewt/scalex[j]
       }
-      if(min(ynewt) <= 0) stop(paste0(
-        "Column ",j," has some value(s) <= 0, but in the original data\n",
-        "it was transformed by Box-Cox. You have to either make all\n",
-        "values in this column strictly positive, or apply transfo()\n",
-        "again to the original data but with type = \"YJ\"."))
-      ynewt <- BC(ynewt, lambdas[j], stdToo = FALSE)$yt
+      if (min(ynewt, na.rm = TRUE) <= 0) # changed
+        stop(paste0("Column ", j, " has some value(s) <= 0, but in the original data\n", 
+                    "it was transformed by Box-Cox. You have to either make all\n", 
+                    "values in this column strictly positive, or apply transfo()\n", 
+                    "again to the original data but with type = \"YJ\"."))
+      ynewt <- BC(ynewt, lambdas[j], stdToo = FALSE)$yt # changed,
+      
       if (standardize) {
         ynewt <- scale(ynewt, muhat[j], sigmahat[j])
       }
       Ynew[, j] <- ynewt
     }
     else {
-      stop(paste0("Invalid transformation type ",ttypes[j],
-                  " for column ",j))
+      stop(paste0("Invalid transformation type ", ttypes[j], 
+                  " for column ", j))
     }
   }
   return(Ynew)
 }
-
-
-transfo_transformback = function (Ynew, transfo.out) {
-  if (is.vector(Ynew)) {
-    Ynew <- matrix(Ynew, ncol = 1)
-  }
-  Ynew <- as.matrix(Ynew)
-  d = ncol(Ynew)
-  dorig = transfo.out$dorig
-  if(d != transfo.out$dorig) stop(paste0(
-    "Ynew should have ",dorig," columns like the original ",
-    "transformed data."))
-  colnamnew = colnames(Ynew)
-  if(is.null(colnamnew)) { colnamnew = seq_len(d) }
-  if(all.equal(colnamnew, transfo.out$colnamX) != TRUE) stop(paste0(
-    "Ynew should have the same column names as the original ",
-    "transformed data."))
-  standardize <- transfo.out$standardize
-  locx <- transfo.out$locx
-  scalex <- transfo.out$scalex
-  ttypes <- transfo.out$ttypes
-  lambdas <- transfo.out$lambdahats
-  muhat <- transfo.out$muhat
-  sigmahat <- transfo.out$sigmahat
-  colInAnalysis <- seq_len(ncol(Ynew))
-  # if (!is.null(transfo.out$out$colInAnalysis)) {
-  #   colInAnalysis <- transfo.out$out$colInAnalysis
-  # }
-  Xnew <- Ynew # initialization
-  for (j in colInAnalysis) {
-    # Shouldn't we step over j in seq_len(length(colInAnalysis)) ?
-    ynewt <- Ynew[, j]
-    if (ttypes[j] == "YJ") {
-      xnewt <- ynewt
-      stan = " "
-      if (standardize) {
-        xnewt <- xnewt * sigmahat[j] + muhat[j]
-        stan = " destandardized "
-      }
-      if(lambdas[j] > 2){
-        lowerb = -1/abs(lambdas[j] - 2)
-        newlowerb = 0.95*lowerb
-        if(min(xnewt) < lowerb) warning(paste0(
-          "The lowest",stan,"value in column ",j," was ",min(xnewt),
-          " .\n","This is below the expected lower bound ",lowerb,
-          " .\n","Such low",stan,"values were put equal to ",
-          newlowerb,"\nso they could be transformed back."))
-        xnewt = pmax(xnewt, newlowerb)
-      }
-      if(lambdas[j] < 0){
-        upperb = 1/abs(lambdas[j])
-        newupperb = 0.95*upperb
-        if(max(xnewt) > upperb) warning(paste0(
-          "The highest",stan,"value in column ",j," was ",max(xnewt),
-          " .\n","This is above the expected upper bound ",upperb,
-          " .\n","Such high",stan,"values were put equal to ",
-          newupperb,"\nso they could be transformed back."))
-        xnewt = pmin(xnewt, newupperb)
-      }
-      xnewt <- iYJ(xnewt, lambdas[j], stdToo = FALSE)$yt
-      if (standardize) {
-        xnewt <- xnewt * scalex[j] + locx[j]
-      }
-      Xnew[, j] <- xnewt
-    }
-    else if (ttypes[j] == "BC") {
-      xnewt <- ynewt
-      stan = " "
-      if (standardize) {
-        xnewt <- xnewt * sigmahat[j] + muhat[j]
-        stan = " destandardized "
-      }
-      if(lambdas[j] > 0){
-        lowerb = -1/abs(lambdas[j])
-        newlowerb = 0.95*lowerb
-        if(min(xnewt) < lowerb) warning(paste0(
-          "The lowest",stan,"value in column ",j," was ",min(xnewt),
-          " .\n","This is below the expected lower bound ",lowerb,
-          " .\n","Such low",stan,"values were put equal to ",
-          newlowerb,"\nso they could be transformed back."))
-        xnewt = pmax(xnewt, newlowerb)  
-      }
-      if(lambdas[j] < 0){
-        upperb = 1/abs(lambdas[j])
-        newupperb = 0.95*upperb
-        if(max(xnewt) > upperb) warning(paste0(
-          "The highest",stan,"value in column ",j," was ",max(xnewt),
-          " .\n","This is above the expected upper bound ",upperb,
-          " .\n","Such high",stan,"values were put equal to ",
-          newupperb,"\nso they could be transformed back."))
-        xnewt = pmin(xnewt, newupperb)
-      }
-      xnewt <- iBC(xnewt, lambdas[j], stdToo = FALSE)$yt
-      if (standardize) {
-        xnewt <- xnewt * scalex[j]
-      }
-      Xnew[, j] <- xnewt
-    }
-    else {
-      stop(paste0("Invalid transformation type ",ttypes[j],
-                  " for column ",j))
-    }
-  }
-  return(Xnew)
-}
-
 
 getTtype <- function(x, type, j=NULL) {
   # Gets the transformation type (BC, YJ, or bestObj) and checks 

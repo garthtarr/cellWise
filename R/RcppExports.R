@@ -33,8 +33,8 @@ updateW_cpp <- function(X, W, mu, Sigma, Sigmai, lambda, h) {
     .Call(`_cellWise_updateW_cpp`, X, W, mu, Sigma, Sigmai, lambda, h)
 }
 
-Cstep <- function(X, W, mu, Sigma, Sigmai, lambda, h, fixedCenter) {
-    .Call(`_cellWise_Cstep`, X, W, mu, Sigma, Sigmai, lambda, h, fixedCenter)
+iterMCD_cpp <- function(X, initmu, initSigma, h, lambdas, crit, noCits, lmin, precScale, fixedCenter, silent) {
+    .Call(`_cellWise_iterMCD_cpp`, X, initmu, initSigma, h, lambdas, crit, noCits, lmin, precScale, fixedCenter, silent)
 }
 
 lts_cpp <- function(X, y, alpha, lambda, nrep, maxIts, nFinal, precScale, h) {

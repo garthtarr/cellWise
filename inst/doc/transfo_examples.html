@@ -115,7 +115,7 @@ section.footnotes {
 <div class="frontmatter">
 <div class="title"><h1>transfo examples</h1></div>
 <div class="author"><h2>Raymaekers, J. and Rousseeuw, P.J.</h2></div>
-<div class="date"><h3>2026-01-08</h3></div>
+<div class="date"><h3>2026-02-25</h3></div>
 </div>
 <div class="body">
 <h1 id="chp:introduction">Introduction</h1>
@@ -351,8 +351,8 @@ summary(lm.out)
 ## Coefficients:
 ##              Estimate Std. Error t value Pr(&gt;|t|)    
 ## (Intercept) 1.0204157  0.0006331  1611.8   &lt;2e-16 ***
-## txX1        0.4763250  0.0006115   779.0   &lt;2e-16 ***
-## txX2        0.4821366  0.0006122   787.6   &lt;2e-16 ***
+## tx1         0.4763250  0.0006115   779.0   &lt;2e-16 ***
+## tx2         0.4821366  0.0006122   787.6   &lt;2e-16 ***
 ## ---
 ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ## 
@@ -362,7 +362,13 @@ summary(lm.out)
 </code></pre>
 <pre><code class="language-r">xnew &lt;- tempx[901:1000, ]
 xtnew &lt;- transfo_newdata(xnew, tx.out)
-yhatnew &lt;- cbind(1, xtnew) %*% lm.out$coefficients 
+</code></pre>
+<pre><code>## Warning in transfo_newdata(xnew, tx.out): Xnew does not have variable names.
+## The number of columns matches that of the original number of input variables
+## given to transfo(). We assume the input variables to this function are given in
+## the same order.
+</code></pre>
+<pre><code class="language-r">yhatnew &lt;- cbind(1, xtnew) %*% lm.out$coefficients 
 plot(tempy[901:1000], yhatnew); abline(0, 1)
 </code></pre>
 <div class="figure" style="text-align: center">

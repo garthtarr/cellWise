@@ -15,8 +15,8 @@ arma::mat subinverse_cpp(const arma::mat& Sigma,
                          const arma::mat& Sigmai,
                          arma::uvec indx);
 
-void uniqueRows(arma::umat W,
-                std::unordered_map<std::string, arma::uvec>& Wmap);
+void uniqueRows(const arma::umat& W,
+                std::unordered_map<std::string,std::vector<arma::uword>>& Wmap);
 
 arma::vec Deltacalc_cpp(const arma::mat & X,
                         const arma::umat & W,
@@ -25,10 +25,17 @@ arma::vec Deltacalc_cpp(const arma::mat & X,
                         const arma::vec & mu,
                         arma::uword j);
 
-arma::vec Deltacalc_cpp2(const arma::mat & X,
-                         const arma::umat & W,
-                         const arma::mat & Sigma,
-                         const arma::mat & Sigmai,
-                         const arma::vec & mu,
-                         arma::uword j);
+
+void Cstep(const arma::mat &X,
+              arma::umat &W,
+              arma::vec &mu,
+              arma::mat &Sigma,
+              const arma::mat &Sigmai,
+              const arma::vec &lambda,
+              const arma::uword &h,
+              const bool fixedCenter);
+
+void truncEig(arma::mat& Sigma,
+              arma::mat& Sigmai,
+              double lmin);
 #endif

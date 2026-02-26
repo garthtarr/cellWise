@@ -115,16 +115,16 @@ BEGIN_RCPP
 END_RCPP
 }
 // Objective_cpp
-double Objective_cpp(arma::mat& X, arma::umat& W, arma::vec& mu, arma::mat& Sigma, arma::mat& Sigmai);
+double Objective_cpp(const arma::mat& X, const arma::umat& W, const arma::vec& mu, const arma::mat& Sigma, const arma::mat& Sigmai);
 RcppExport SEXP _cellWise_Objective_cpp(SEXP XSEXP, SEXP WSEXP, SEXP muSEXP, SEXP SigmaSEXP, SEXP SigmaiSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< arma::mat& >::type X(XSEXP);
-    Rcpp::traits::input_parameter< arma::umat& >::type W(WSEXP);
-    Rcpp::traits::input_parameter< arma::vec& >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< arma::mat& >::type Sigma(SigmaSEXP);
-    Rcpp::traits::input_parameter< arma::mat& >::type Sigmai(SigmaiSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const arma::umat& >::type W(WSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Sigma(SigmaSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type Sigmai(SigmaiSEXP);
     rcpp_result_gen = Rcpp::wrap(Objective_cpp(X, W, mu, Sigma, Sigmai));
     return rcpp_result_gen;
 END_RCPP
@@ -146,21 +146,24 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// Cstep
-Rcpp::List Cstep(const arma::mat& X, arma::umat W, const arma::vec& mu, const arma::mat& Sigma, const arma::mat& Sigmai, const arma::vec& lambda, const arma::uword& h, const bool fixedCenter);
-RcppExport SEXP _cellWise_Cstep(SEXP XSEXP, SEXP WSEXP, SEXP muSEXP, SEXP SigmaSEXP, SEXP SigmaiSEXP, SEXP lambdaSEXP, SEXP hSEXP, SEXP fixedCenterSEXP) {
+// iterMCD_cpp
+Rcpp::List iterMCD_cpp(const arma::mat& X, const arma::vec& initmu, const arma::mat& initSigma, const arma::uword h, const arma::vec& lambdas, const double crit, const arma::uword noCits, const double lmin, const double precScale, const bool fixedCenter, const bool silent);
+RcppExport SEXP _cellWise_iterMCD_cpp(SEXP XSEXP, SEXP initmuSEXP, SEXP initSigmaSEXP, SEXP hSEXP, SEXP lambdasSEXP, SEXP critSEXP, SEXP noCitsSEXP, SEXP lminSEXP, SEXP precScaleSEXP, SEXP fixedCenterSEXP, SEXP silentSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
-    Rcpp::traits::input_parameter< arma::umat >::type W(WSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type mu(muSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type Sigma(SigmaSEXP);
-    Rcpp::traits::input_parameter< const arma::mat& >::type Sigmai(SigmaiSEXP);
-    Rcpp::traits::input_parameter< const arma::vec& >::type lambda(lambdaSEXP);
-    Rcpp::traits::input_parameter< const arma::uword& >::type h(hSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type initmu(initmuSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type initSigma(initSigmaSEXP);
+    Rcpp::traits::input_parameter< const arma::uword >::type h(hSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type lambdas(lambdasSEXP);
+    Rcpp::traits::input_parameter< const double >::type crit(critSEXP);
+    Rcpp::traits::input_parameter< const arma::uword >::type noCits(noCitsSEXP);
+    Rcpp::traits::input_parameter< const double >::type lmin(lminSEXP);
+    Rcpp::traits::input_parameter< const double >::type precScale(precScaleSEXP);
     Rcpp::traits::input_parameter< const bool >::type fixedCenter(fixedCenterSEXP);
-    rcpp_result_gen = Rcpp::wrap(Cstep(X, W, mu, Sigma, Sigmai, lambda, h, fixedCenter));
+    Rcpp::traits::input_parameter< const bool >::type silent(silentSEXP);
+    rcpp_result_gen = Rcpp::wrap(iterMCD_cpp(X, initmu, initSigma, h, lambdas, crit, noCits, lmin, precScale, fixedCenter, silent));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -193,7 +196,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_cellWise_allpreds_cpp", (DL_FUNC) &_cellWise_allpreds_cpp, 4},
     {"_cellWise_Objective_cpp", (DL_FUNC) &_cellWise_Objective_cpp, 5},
     {"_cellWise_updateW_cpp", (DL_FUNC) &_cellWise_updateW_cpp, 7},
-    {"_cellWise_Cstep", (DL_FUNC) &_cellWise_Cstep, 8},
+    {"_cellWise_iterMCD_cpp", (DL_FUNC) &_cellWise_iterMCD_cpp, 11},
     {"_cellWise_lts_cpp", (DL_FUNC) &_cellWise_lts_cpp, 9},
     {NULL, NULL, 0}
 };
