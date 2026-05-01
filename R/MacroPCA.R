@@ -1009,59 +1009,169 @@ maxAngle <- function(Ptrue, Phat) {
 
 
 
-truncPC = function (X, ncomp = NULL, scale = FALSE, center = TRUE, 
-                    signflip = TRUE, via.svd = NULL, scores = FALSE) { 
-  if (!is.numeric(X)) 
-    stop(" X must be numeric.")
+truncPC <- function(X, ncomp = NULL, scale = FALSE, center = TRUE,
+                         signflip = TRUE, via.svd = NULL, scores = FALSE,
+                         tol = 1e-10, stop_rank_zero = TRUE) {
+
+  if (!is.numeric(X)) {
+    stop("X must be numeric.")
+  }
+
   Y <- as.matrix(X)
-  if (!(length(dim(Y)) == 2)) 
-    stop(" X is not a matrix.")
+
+  if (length(dim(Y)) != 2) {
+    stop("X is not a matrix.")
+  }
+
   n <- nrow(Y)
   d <- ncol(Y)
-  if (n < 2) 
-    stop(" The number of rows must be at least 2.")
-  Y <- scale(Y, center = center, scale = scale)
-  if (isTRUE(scale)) 
-    scale <- attr(Y, "scaled:scale")
-  if (isTRUE(center)) { center <- attr(Y, "scaled:center")
-  } else { center = rep(0, d) }
+
+  if (n < 2) {
+    stop("The number of rows must be at least 2.")
+  }
+
+  if (d < 1) {
+    stop("The number of columns must be at least 1.")
+  }
+
+  if (any(!is.finite(Y))) {
+    stop("X contains non-finite values after preprocessing.")
+  }
+
+  ## Work out requested number of components
   if (is.null(ncomp)) {
-    SvdY <- try(svd::propack.svd(Y, neig = min(n, d)), silent = TRUE)
-    if (inherits(SvdY, "try-error")) {
-      SvdY <- svd(Y, nu = min(n, d), nv = min(n, d))
+    ncomp_req <- min(n, d)
+  } else {
+    if (!is.numeric(ncomp) || length(ncomp) != 1 || is.na(ncomp) || ncomp < 1) {
+      stop("ncomp must be a single number at least 1.")
+    }
+    ncomp_req <- min(floor(ncomp), n, d)
+  }
+
+  ## Centre and/or scale
+  Y <- scale(Y, center = center, scale = scale)
+
+  if (isTRUE(center)) {
+    center_out <- attr(Y, "scaled:center")
+  } else if (is.numeric(center) && length(center) == d) {
+    center_out <- center
+  } else {
+    center_out <- rep(0, d)
+  }
+
+  if (isTRUE(scale)) {
+    scale_out <- attr(Y, "scaled:scale")
+
+    ## Avoid downstream Inf/NaN if a column has zero scale
+    bad_scale <- !is.finite(scale_out) | scale_out < tol
+
+    if (any(bad_scale)) {
+      warning(
+        "Some columns have zero or near-zero scale; setting their scale to 1."
+      )
+      scale_out[bad_scale] <- 1
+      Y <- scale(as.matrix(X), center = center_out, scale = scale_out)
+    }
+
+  } else if (is.numeric(scale) && length(scale) == d) {
+    scale_out <- scale
+  } else {
+    scale_out <- FALSE
+  }
+
+  if (any(!is.finite(Y))) {
+    stop("Centring/scaling produced non-finite values.")
+  }
+
+  ## Compute SVD.
+  ## Try propack first, but only accept it if the returned object is usable.
+  SvdY <- NULL
+
+  if (is.null(via.svd) || identical(via.svd, FALSE)) {
+    SvdY_try <- try(
+      svd::propack.svd(Y, neig = ncomp_req),
+      silent = TRUE
+    )
+
+    if (!inherits(SvdY_try, "try-error") &&
+        !is.null(SvdY_try$d) &&
+        !is.null(SvdY_try$v) &&
+        length(SvdY_try$d) >= 1 &&
+        ncol(SvdY_try$v) >= 1) {
+      SvdY <- SvdY_try
     }
   }
-  else {
-    if (!(ncomp >= 1)) 
-      stop(" ncomp must be at least 1")
-    ncomp <- min(ncomp, n, d)
-    SvdY <- try(svd::propack.svd(Y, neig = ncomp), silent = TRUE)
-    if (inherits(SvdY, "try-error")) {
-      SvdY <- svd(Y, nu = ncomp, nv = ncomp)
+
+  if (is.null(SvdY)) {
+    SvdY <- svd(Y, nu = ncomp_req, nv = ncomp_req)
+  }
+
+  singvals <- as.numeric(SvdY$d)
+  loadings <- as.matrix(SvdY$v)
+
+  ## Defensive cap: only keep components that actually exist in both d and v.
+  n_avail <- min(length(singvals), ncol(loadings), ncomp_req)
+
+  if (n_avail < 1) {
+    if (stop_rank_zero) {
+      stop("No singular vectors were returned.")
+    } else {
+      return(list(
+        rank = 0,
+        eigenvalues = numeric(0),
+        loadings = matrix(numeric(0), nrow = d, ncol = 0),
+        scores = if (scores) matrix(numeric(0), nrow = n, ncol = 0) else NULL,
+        center = center_out,
+        scale = scale_out
+      ))
     }
   }
-  eigvals <- SvdY$d
-  rank <- sum(eigvals > 1e-10)
-  if (rank == 0) 
-    stop(" The data has rank zero")
-  eigvals <- (eigvals[seq_len(rank)])^2/(n - 1)
-  loadings <- SvdY$v
-  dim(loadings)
+
+  singvals <- singvals[seq_len(n_avail)]
+  loadings <- loadings[, seq_len(n_avail), drop = FALSE]
+
+  ## Numerical rank among returned components.
+  ## This rank is now guaranteed not to exceed ncol(loadings).
+  rank <- sum(singvals > tol)
+  rank <- min(rank, n_avail, ncol(loadings))
+
+  if (rank < 1) {
+    if (stop_rank_zero) {
+      stop("The data has rank zero.")
+    } else {
+      return(list(
+        rank = 0,
+        eigenvalues = numeric(0),
+        loadings = matrix(numeric(0), nrow = d, ncol = 0),
+        scores = if (scores) matrix(numeric(0), nrow = n, ncol = 0) else NULL,
+        center = center_out,
+        scale = scale_out
+      ))
+    }
+  }
+
+  eigvals <- singvals[seq_len(rank)]^2 / (n - 1)
   loadings <- loadings[, seq_len(rank), drop = FALSE]
+
   if (signflip) {
-    flipcolumn <- function(x) {
-      if (x[which.max(abs(x))] < 0) {
-        -x
-      }
-      else {
-        x
+    for (j in seq_len(ncol(loadings))) {
+      i_max <- which.max(abs(loadings[, j]))
+      if (loadings[i_max, j] < 0) {
+        loadings[, j] <- -loadings[, j]
       }
     }
-    loadings <- apply(loadings, 2L, FUN = flipcolumn)
   }
-  list(rank = rank, eigenvalues = eigvals, loadings = loadings, 
-       scores = if (scores) Y %*% loadings, center = center, 
-       scale = scale)
+
+  out <- list(
+    rank = rank,
+    eigenvalues = eigvals,
+    loadings = loadings,
+    scores = if (scores) Y %*% loadings else NULL,
+    center = center_out,
+    scale = scale_out
+  )
+
+  out
 }
 
 
